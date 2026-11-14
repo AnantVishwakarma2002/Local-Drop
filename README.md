@@ -1,87 +1,101 @@
-# LocalDrop 🚀
+# LocalDrop
 
-**Direct Peer-to-Peer Local File Transfer. No apps, no cloud, just your browser.**
+**Send files between your devices straight from the browser. No apps, no cloud, no cables.**
 
-LocalDrop is an offline, zero-internet web application that allows high-speed file transfers between devices on the same Wi-Fi network or mobile hotspot. It leverages WebRTC for secure 1-to-1 data channels and the modern Origin Private File System (OPFS) API to stream files directly to disk, bypassing traditional browser memory bottlenecks and enabling massive (5GB+) file transfers at native network speeds.
+LocalDrop is a web-based alternative to apps like ShareIt and Xender. Open it on any device with a modern browser (laptop, phone, tablet), join the same room, and send files directly to each other over your local network.
 
-## 🌟 Key Features
+## Features
 
-1. **Multi-Device Lobby System:** Connect multiple devices to a single Room ID and view a live directory of active users.
-2. **Targeted WebRTC Routing:** Send files directly to a specific user without broadcasting to the entire network.
-3. **High-Speed OPFS Streaming:** Receiver directly writes data to disk in 4MB batches, preventing mobile CPU choking and RAM crashes.
-4. **Asynchronous Pre-Fetching:** The sender reads files in massive 4MB blocks while pre-fetching the next block, keeping the network pipe constantly full.
-5. **Premium Responsive UI:** A modern, glassmorphism-inspired dark/light theme that adapts to your device, complete with live status indicators and real-time speed/ETA metrics.
+- **Works everywhere:** Windows, macOS, Linux, Android and iOS, with nothing to install on the client devices.
+- **Direct device-to-device transfer:** files travel over WebRTC data channels and never pass through or get stored on the server. The server only introduces devices to each other.
+- **Room-based lobby:** join a room with a shared Room ID and see everyone who is online.
+- **Fast transfers:** large read-ahead blocks, big chunks and back-pressure control keep the connection full.
+- **Streams to disk:** where the browser supports it, incoming files are written to disk as they arrive instead of piling up in memory.
+- **Live progress:** speed, percentage and ETA, with a clear success or failure state.
+- **Responsive UI:** works on small phone screens and large monitors, with automatic light and dark themes.
 
----
+## Screenshots
 
-## 📸 Screenshots
+| | |
+|:---:|:---:|
+| ![Screenshot 1](./screenshot1.png) | ![Screenshot 2](screenshots/screenshot2.png) |
+| ![Screenshot 3](screenshots/screenshot3.png) | ![Screenshot 4](screenshots/screenshot4.png) |
+| ![Screenshot 5](screenshots/screenshot5.png) | |
 
-![screenshot1](screenshot1.png)
+## How it works
 
-### 2. Multi-User Lobby
-![Multi-User Lobby](screenshot2)
+1. Every device opens the LocalDrop page served by the Node.js server and joins the same room.
+2. The server keeps the list of users in each room and relays the WebRTC handshake (offer, answer and ICE candidates) between two chosen devices, using Socket.IO.
+3. Once the handshake is done, the two browsers connect directly and the file is sent in chunks over a WebRTC data channel.
 
-### 3. File Transfer in Progress (Sender)
-![Transfer Progress Sender](screenshot3)
+**Tech stack:** Node.js, Express, Socket.IO, WebRTC (data channels), vanilla HTML/CSS/JavaScript.
 
-### 4. File Transfer in Progress (Receiver)
-![Transfer Progress Receiver](screenshot4)
+## Installation
 
-### 5. Transfer Complete
-![Transfer Complete](screenshot5)
+### Prerequisites
 
----
+- [Node.js](https://nodejs.org/) 16 or newer
+- All devices on the same Wi-Fi network (or on a hotspot created by the computer running the server)
 
-## 🛠️ Tech Stack
+### 1. Get the files
 
-* **Frontend:** HTML5, CSS3 (CSS Variables, Responsive Design), Vanilla JavaScript.
-* **Networking:** WebRTC (RTCDataChannel) for direct P2P binary transfer.
-* **Storage:** HTML5 File API & Origin Private File System (OPFS).
-* **Backend (Signaling):** Node.js, Express.js, Socket.io.
+Clone or download this repository, then make sure the files are laid out like this:
 
----
-
-## 🚀 Installation & Usage Guide
-
-Assuming you have [Node.js](https://nodejs.org/) installed, follow these steps to run LocalDrop on your local network.
-
-### 1. Clone the repository
-```bash
-git clone https://github.com/AnantVishwakarma2002/LocalDrop.git
-cd LocalDrop
 ```
-
-### 2. Project Structure
-Ensure your files are structured exactly like this:
-```text
-LocalDrop/
-│
-├── server.js          # The Node.js signaling server
+localdrop/
+├── server.js
 └── public/
-    └── index.html     # The frontend UI and WebRTC logic
+    └── index.html
 ```
 
-### 3. Install Dependencies
-Initialize the project and install `express` and `socket.io` for the signaling server:
+If `index.html` is not already inside a folder named `public`, create that folder and move it in. The server serves everything in `public/`.
+
+### 2. Install dependencies
+
+Open a terminal in the project folder and run:
+
 ```bash
 npm init -y
 npm install express socket.io
 ```
 
-### 4. Start the Server
+### 3. Start the server
+
 ```bash
 node server.js
 ```
-The server will start on port `3000`.
 
-### 5. Connect Your Devices
-1. Find your host computer's local IP address (e.g., `192.168.1.5`).
-2. Open a web browser on the host computer and go to `http://localhost:3000`.
-3. Connect your phone or other devices to the **same Wi-Fi network or Hotspot**.
-4. Open a browser on your phone and enter the host's IP address and port: `http://192.168.1.5:3000`.
-5. Enter a Name and a shared Room ID on both devices to join the lobby and start transferring!
+You should see:
 
----
+```
+Server running on port 3000
+```
 
-## 💡 How It Works Under the Hood
-LocalDrop avoids the traditional `FileReader` bottleneck found in most browser-based transfer tools. Instead of reading an entire file into RAM, the sender asynchronously pre-fetches chunks and manages WebRTC backpressure (`MAX_BUFFER` limits). The receiver catches these chunks and batches them into a 4MB array before flushing them directly to the hard drive via the OPFS `createWritable()` stream. This ensures that even mobile devices with limited CPU/RAM can handle gigabytes of data seamlessly.
+### 4. Open it on your devices
+
+1. Find the local IP address of the computer running the server:
+   - **Windows:** run `ipconfig` and look for the IPv4 Address.
+   - **macOS / Linux:** run `ifconfig` or `ip a`, or check your Wi-Fi settings.
+2. On the same computer, open `http://localhost:3000`.
+3. On your phone or tablet, open `http://<your-computer-ip>:3000` (for example `http://192.168.1.12:3000`).
+4. On every device, enter a name and the **same Room ID**, then tap **Join Lobby**.
+5. Tap **Send File** next to a device, pick a file, and the transfer starts.
+
+## Notes and troubleshooting
+
+- **Firewall:** if other devices cannot open the page, allow Node.js (or port `3000`) through your computer's firewall.
+- **Same network required:** LocalDrop does not use STUN or TURN servers, so devices must be on the same local network.
+- **Hotspots and routers:** some routers and hotspots isolate connected devices from each other (client or AP isolation), which can stop two phones from connecting directly. Transfers to and from the computer running the server will still work. Turn off client isolation in your router settings if you can.
+- **Plain HTTP and big files:** browsers only allow disk streaming (the Origin Private File System) on secure pages (HTTPS or `localhost`). On `http://<ip>:3000`, or in browsers without support, the receiving device falls back to keeping the file in memory, so very large files may be limited by available RAM.
+- **Changing the port:** edit the `PORT` constant at the bottom of `server.js`.
+
+## Project structure
+
+| File | Purpose |
+|------|---------|
+| `server.js` | Express and Socket.IO server: serves the page, manages rooms and relays WebRTC signaling |
+| `public/index.html` | The whole client: UI, lobby and WebRTC file transfer |
+
+## License
+
+This project is open source. Add a license of your choice (for example MIT) before publishing.
