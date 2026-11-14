@@ -16,8 +16,6 @@ LocalDrop is an offline, zero-internet web application that allows high-speed fi
 
 ## 📸 Screenshots
 
-*(Replace the placeholder names below with your actual image files, e.g., `screenshot1.png`)*
-
 ### 1. The Setup Screen
 ![Setup Screen](screenshot1)
 
