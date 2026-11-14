@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#5b5bf0">
+    <title>LocalDrop - Lobby Network</title>
+    <style>
+        /* =========================================================
+           Design tokens (light + dark, follows the device setting)
+           System fonts only, so the UI also works offline on a LAN.
+           ========================================================= */
+        :root {
+            --bg: #f4f5fb;
+            --surface: #ffffff;
+            --surface-2: #f0f2f9;
+            --border: rgba(24, 28, 70, 0.09);
+            --text: #14172b;
+            --muted: #666b8a;
+            --accent: #5b5bf0;
+            --accent-2: #2fa8ff;
+            --accent-soft: rgba(91, 91, 240, 0.10);
+            --ok: #16a34a;
+            --ok-2: #34d399;
+            --err: #e5484d;
+            --track: #e4e7f3;
+            --shadow: 0 1px 2px rgba(20, 23, 60, 0.04), 0 12px 32px -8px rgba(40, 44, 120, 0.14);
+            --ring: 0 0 0 3px rgba(91, 91, 240, 0.28);
+            --radius: 20px;
+            --bar: linear-gradient(90deg, var(--accent), var(--accent-2));
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0a0c18;
+                --surface: #131627;
+                --surface-2: #1b1f36;
+                --border: rgba(160, 170, 255, 0.12);
+                --text: #eceefb;
+                --muted: #9298bb;
+                --accent: #7c7cff;
+                --accent-2: #38b6ff;
+                --accent-soft: rgba(124, 124, 255, 0.14);
+                --ok: #34d399;
+                --ok-2: #6ee7b7;
+                --err: #ff6b70;
+                --track: #23284a;
+                --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -10px rgba(0, 0, 0, 0.6);
+                --ring: 0 0 0 3px rgba(124, 124, 255, 0.4);
+            }
+        }
+
+        * { box-sizing: border-box; }
+
+        html { -webkit-text-size-adjust: 100%; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            min-height: 100dvh;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: var(--text);
+            background: var(--bg);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+                     max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+        }
+
+        /* Soft ambient background glow */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background:
+                radial-gradient(60rem 36rem at 12% -10%, var(--accent-soft), transparent 60%),
+                radial-gradient(48rem 30rem at 100% 0%, rgba(47, 168, 255, 0.10), transparent 60%),
+                radial-gradient(40rem 28rem at 50% 110%, rgba(91, 91, 240, 0.08), transparent 60%);
+            pointer-events: none;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 520px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* ------------------------- Brand ------------------------- */
+        .brand {
+            text-align: center;
+            padding: 20px 8px 8px;
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 14px;
+            border-radius: 18px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            box-shadow: 0 12px 28px -8px rgba(91, 91, 240, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        }
+
+        .logo svg { width: 30px; height: 30px; }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 1.9rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .brand h1 span {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .tagline {
+            margin: 6px auto 0;
+            max-width: 34ch;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        /* -------------------------- Cards ------------------------- */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 22px;
+            animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        }
+
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: none; }
+        }
+
+        .card h2 {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+
+        .card .sub {
+            margin: 4px 0 18px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        /* ------------------------- Form --------------------------- */
+        .field { display: block; margin-bottom: 14px; }
+
+        .field > span {
+            display: block;
+            margin: 0 0 6px 2px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--muted);
+            letter-spacing: 0.02em;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            height: 50px;
+            padding: 0 16px;
+            font: inherit;
+            font-size: 16px; /* prevents iOS zoom-on-focus */
+            color: var(--text);
+            background: var(--surface-2);
+            border: 1.5px solid transparent;
+            border-radius: 14px;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+        }
+
+        input[type="text"]::placeholder { color: var(--muted); opacity: 0.75; }
+
+        input[type="text"]:focus {
+            background: var(--surface);
+            border-color: var(--accent);
+            box-shadow: var(--ring);
+        }
+
+        .btn-primary {
+            width: 100%;
+            height: 52px;
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font: inherit;
+            font-size: 1rem;
+            font-weight: 650;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            border: 0;
+            border-radius: 14px;
+            cursor: pointer;
+            box-shadow: 0 10px 22px -8px rgba(91, 91, 240, 0.6);
+            transition: transform 0.12s, box-shadow 0.15s, filter 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-primary svg { width: 18px; height: 18px; }
+        .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 14px 28px -8px rgba(91, 91, 240, 0.7); }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:focus-visible { outline: none; box-shadow: var(--ring), 0 10px 22px -8px rgba(91, 91, 240, 0.6); }
+
+        .hint {
+            margin: 14px 0 0;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        .hint svg { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--accent); }
+
+        /* ------------------------- Lobby -------------------------- */
+        .lobby-panel { display: none; }
+
+        .lobby-head {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 100%;
+            padding: 6px 12px 6px 10px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            font-size: 0.85rem;
+        }
+
+        .pill-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .pill strong {
+            font-weight: 650;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 22ch;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--ok);
+            box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5);
+            animation: live 2s infinite;
+        }
+
+        @keyframes live {
+            0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+            70%  { box-shadow: 0 0 0 7px rgba(52, 211, 153, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 0 0 6px;
+        }
+
+        .section-title h3 {
+            margin: 0;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .count {
+            min-width: 24px;
+            padding: 2px 8px;
+            text-align: center;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--accent);
+            background: var(--accent-soft);
+            border-radius: 999px;
+        }
+
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            animation: rise 0.35s ease both;
+        }
+
+        .user-item:last-child { border-bottom: none; padding-bottom: 2px; }
+
+        .user-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+        .avatar {
+            flex: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            font-weight: 750;
+            font-size: 1.05rem;
+            color: #fff;
+            background: linear-gradient(135deg, hsl(var(--h) 78% 56%), hsl(calc(var(--h) + 38) 80% 50%));
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .user-meta { display: flex; flex-direction: column; min-width: 0; }
+
+        .user-name {
+            font-weight: 650;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-sub {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+
+        .user-sub i {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--ok);
+        }
+
+        .btn-send {
+            flex: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 42px;
+            padding: 0 16px;
+            font: inherit;
+            font-size: 0.9rem;
+            font-weight: 650;
+            color: var(--accent);
+            background: var(--accent-soft);
+            border: 1px solid transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, transform 0.12s, box-shadow 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-send svg { width: 16px; height: 16px; }
+
+        .btn-send:hover {
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            box-shadow: 0 8px 18px -8px rgba(91, 91, 240, 0.7);
+        }
+
+        .btn-send:active { transform: scale(0.96); }
+        .btn-send:focus-visible { outline: none; box-shadow: var(--ring); }
+
+        /* Empty state with radar pulse */
+        .empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 22px 8px 12px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .radar {
+            position: relative;
+            width: 76px;
+            height: 76px;
+            margin-bottom: 14px;
+            display: grid;
+            place-items: center;
+        }
+
+        .radar::before,
+        .radar::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            opacity: 0;
+            animation: radar 2.4s ease-out infinite;
+        }
+
+        .radar::after { animation-delay: 1.2s; }
+
+        @keyframes radar {
+            0%   { transform: scale(0.35); opacity: 0.7; }
+            100% { transform: scale(1.15); opacity: 0; }
+        }
+
+        .radar-core {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        .radar-core svg { width: 20px; height: 20px; }
+
+        /* ----------------------- Transfer panel -------------------- */
+        #fileInput { display: none; }
+
+        .transfer-panel { display: none; }
+
+        #progressArea[data-state="active"] { --bar: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+        #progressArea[data-state="done"]   { --bar: linear-gradient(90deg, var(--ok), var(--ok-2)); }
+        #progressArea[data-state="error"]  { --bar: linear-gradient(90deg, var(--err), var(--err)); }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .status-icon {
+            flex: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        #progressArea[data-state="active"] .status-icon {
+            border: 3px solid var(--accent-soft);
+            border-top-color: var(--accent);
+            animation: spin 0.9s linear infinite;
+        }
+
+        #progressArea[data-state="done"] .status-icon  { background: var(--ok); }
+        #progressArea[data-state="done"] .status-icon::after  { content: "\2713"; }
+        #progressArea[data-state="error"] .status-icon { background: var(--err); }
+        #progressArea[data-state="error"] .status-icon::after { content: "!"; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status-header {
+            min-width: 0;
+            font-weight: 650;
+            font-size: 0.95rem;
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        progress {
+            -webkit-appearance: none;
+            appearance: none;
+            display: block;
+            width: 100%;
+            height: 12px;
+            border: 0;
+            border-radius: 999px;
+            overflow: hidden;
+            background: var(--track);
+        }
+
+        progress::-webkit-progress-bar { background: var(--track); border-radius: 999px; }
+        progress::-webkit-progress-value { background: var(--bar); border-radius: 999px; transition: width 0.2s ease; }
+        progress::-moz-progress-bar { background: var(--bar); border-radius: 999px; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .stats span {
+            padding: 10px 6px;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 650;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            color: var(--text);
+            background: var(--surface-2);
+            border-radius: 12px;
+        }
+
+        .stats span:nth-child(2) { color: var(--accent); }
+
+        .footer-note {
+            margin: 4px 0 0;
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+
+        @media (max-width: 380px) {
+            .card { padding: 18px; }
+            .btn-send span { display: none; }
+            .btn-send { padding: 0 13px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <header class="brand">
+            <div class="logo" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 4v12"/><path d="M3.5 12.5 7 16l3.5-3.5"/>
+                    <path d="M17 20V8"/><path d="M13.5 11.5 17 8l3.5 3.5"/>
+                </svg>
+            </div>
+            <h1>Local<span>Drop</span></h1>
+            <p class="tagline">Send files straight between your devices. No apps, no cloud, just your browser.</p>
+        </header>
+
+        <section id="setup" class="card">
+            <h2>Join a room</h2>
+            <p class="sub">Use the same Room ID on every device you want to connect.</p>
+
+            <label class="field">
+                <span>Your name</span>
+                <input type="text" id="nameInput" placeholder="Your Name (e.g., Anant's Laptop)" autocomplete="off" />
+            </label>
+            <label class="field">
+                <span>Room ID</span>
+                <input type="text" id="roomInput" placeholder="Room ID" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            </label>
+
+            <button class="btn-primary" onclick="joinRoom()">
+                <span>Join Lobby</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+            </button>
+
+            <p class="hint">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+                <span>Connect all devices to the same Wi-Fi or hotspot for the fastest transfers.</span>
+            </p>
+        </section>
+
+        <section id="lobby" class="card lobby-panel">
+            <div class="lobby-head">
+                <div class="pill"><i class="live-dot"></i><span class="pill-label">Room</span><strong id="currentRoom"></strong></div>
+                <div class="pill"><span class="pill-label">You</span><strong id="myName"></strong></div>
+            </div>
+            <div class="section-title">
+                <h3>Active Users</h3>
+                <span class="count" id="userCount">0</span>
+            </div>
+            <div id="userList"></div>
+        </section>
+
+        <!-- Hidden file input to trigger when clicking "Send" next to a user -->
+        <input type="file" id="fileInput" />
+
+        <section id="progressArea" class="card transfer-panel" data-state="active">
+            <div class="status-row">
+                <span class="status-icon" aria-hidden="true"></span>
+                <div id="status" class="status-header" aria-live="polite">Waiting...</div>
+            </div>
+            <progress id="progressBar" value="0" max="100"></progress>
+            <div class="stats">
+                <span id="speedMetric">0.00 MB/s</span>
+                <span id="percentMetric">0%</span>
+                <span id="etaMetric">ETA: --</span>
+            </div>
+        </section>
+
+        <p class="footer-note">Files go directly between devices, they are never stored on the server.</p>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let peerConnection;
+        let dataChannel;
+
+        let mySocketId = null;
+        let activeTargetId = null;
+        let pendingFile = null;
+
+        // ---- Tuning ----------------------------------------------------
+        // Phones read files slowly (each File.slice().arrayBuffer() call has
+        // high latency), so we read BIG blocks, prefetch the next block while
+        // the current one is being sent, and split blocks into network chunks.
+        const READ_BLOCK = 4 * 1024 * 1024;        // bytes read from disk per call
+        const DEFAULT_CHUNK = 64 * 1024;           // safe fallback message size
+        const MAX_CHUNK = 256 * 1024;              // cap (Chrome/Safari limit)
+        const MAX_BUFFER = 8 * 1024 * 1024;        // pause sending above this
+        const LOW_BUFFER = 2 * 1024 * 1024;        // resume sending below this
+        const RX_FLUSH_BYTES = 4 * 1024 * 1024;    // receiver batches writes to disk
+        const configuration = { 'iceServers': [] };
+
+        // Progress tracking
+        let windowStartTime = 0;
+        let windowStartBytes = 0;
+        let lastUiUpdate = 0;
+
+        // Receiver state
+        let incomingFileInfo = null;
+        let receivedSize = 0;
+        let fileHandle = null;
+        let fileStream = null;
+        let incomingFileData = [];
+        let rxBatch = [];
+        let rxBatchBytes = 0;
+        let rxChain = Promise.resolve(); // keeps incoming messages strictly ordered
+
+        // Sender backpressure
+        let drainResolve = null;
+
+        function joinRoom() {
+            const name = document.getElementById('nameInput').value.trim();
+            const room = document.getElementById('roomInput').value.trim();
+            if (name && room) {
+                socket.emit('join-room', room, name);
+            } else {
+                alert("Please enter both a Name and a Room ID.");
+            }
+        }
+
+        // ---- Visual helpers (design only, no effect on transfer logic) ----
+        function avatarHue(str) {
+            let h = 0;
+            for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+            return h;
+        }
+
+        // Colors the transfer panel (blue = active, green = done, red = failed)
+        // based on the status text, without touching any transfer code.
+        new MutationObserver(() => {
+            const text = document.getElementById('status').innerText.toLowerCase();
+            let state = 'active';
+            if (text.includes('fail')) state = 'error';
+            else if (text.includes('success') || text.includes('complete')) state = 'done';
+            document.getElementById('progressArea').setAttribute('data-state', state);
+        }).observe(document.getElementById('status'), { childList: true, characterData: true, subtree: true });
+
+        // 1. Lobby Management
+        socket.on('room-joined', (roomId, socketId) => {
+            mySocketId = socketId;
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('lobby').style.display = 'block';
+            document.getElementById('currentRoom').textContent = roomId;
+            document.getElementById('myName').textContent = document.getElementById('nameInput').value;
+        });
+
+        socket.on('room-users', (users) => {
+            const listDiv = document.getElementById('userList');
+            listDiv.innerHTML = '';
+
+            const otherUsers = users.filter(u => u.id !== mySocketId);
+            document.getElementById('userCount').textContent = otherUsers.length;
+
+            if (otherUsers.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'empty';
+                empty.innerHTML =
+                    '<div class="radar"><div class="radar-core">' +
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><path d="M12 19.5h.01"/></svg>' +
+                    '</div></div>';
+                const msg = document.createElement('span');
+                msg.textContent = 'No one else is here yet. Waiting for others to join...';
+                empty.appendChild(msg);
+                listDiv.appendChild(empty);
+                return;
+            }
+
+            otherUsers.forEach(user => {
+                const userRow = document.createElement('div');
+                userRow.className = 'user-item';
+
+                const info = document.createElement('div');
+                info.className = 'user-info';
+
+                const avatar = document.createElement('div');
+                avatar.className = 'avatar';
+                avatar.style.setProperty('--h', avatarHue(user.name || ''));
+                avatar.textContent = (Array.from((user.name || '?').trim())[0] || '?').toUpperCase();
+
+                const meta = document.createElement('div');
+                meta.className = 'user-meta';
+
+                const nameEl = document.createElement('span');
+                nameEl.className = 'user-name';
+                nameEl.textContent = user.name; // textContent: no HTML injection
+
+                const sub = document.createElement('span');
+                sub.className = 'user-sub';
+                sub.innerHTML = '<i></i>Online';
+
+                meta.appendChild(nameEl);
+                meta.appendChild(sub);
+                info.appendChild(avatar);
+                info.appendChild(meta);
+
+                const btn = document.createElement('button');
+                btn.className = 'btn-send';
+                btn.innerHTML =
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></svg><span>Send File</span>';
+                btn.addEventListener('click', () => prepareSend(user.id));
+
+                userRow.appendChild(info);
+                userRow.appendChild(btn);
+                listDiv.appendChild(userRow);
+            });
+        });
+
+        // 2. Outgoing Transfer Initiation
+        function prepareSend(targetId) {
+            activeTargetId = targetId;
+            document.getElementById('fileInput').click();
+        }
+
+        document.getElementById('fileInput').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file || !activeTargetId) return;
+
+            pendingFile = file;
+            document.getElementById('progressArea').style.display = 'block';
+            resetProgressUI('Connecting to peer...', pendingFile.name);
+
+            peerConnection = new RTCPeerConnection(configuration);
+            setupIceCandidateHandling(activeTargetId);
+
+            dataChannel = peerConnection.createDataChannel('sendDataChannel');
+            setupDataChannel(dataChannel);
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('targeted-offer', offer, activeTargetId);
+
+            document.getElementById('fileInput').value = '';
+        });
+
+        // 3. Incoming Transfer Initiation
+        socket.on('targeted-offer', async (offer, senderId, senderName) => {
+            activeTargetId = senderId;
+            document.getElementById('progressArea').style.display = 'block';
+            resetProgressUI(`Accepting connection from ${senderName}...`, '');
+
+            peerConnection = new RTCPeerConnection(configuration);
+            setupIceCandidateHandling(activeTargetId);
+
+            peerConnection.ondatachannel = (event) => {
+                dataChannel = event.channel;
+                setupDataChannel(dataChannel);
+            };
+
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('targeted-answer', answer, activeTargetId);
+        });
+
+        // 4. Handshake completion
+        socket.on('targeted-answer', async (answer, responderId) => {
+            if (activeTargetId === responderId) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            }
+        });
+
+        socket.on('targeted-ice-candidate', async (candidate, senderId) => {
+            if (activeTargetId === senderId && peerConnection) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (err) {
+                    console.warn('ICE candidate error', err);
+                }
+            }
+        });
+
+        function setupIceCandidateHandling(targetId) {
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('targeted-ice-candidate', event.candidate, targetId);
+                }
+            };
+        }
+
+        // 5. Data channel
+        function setupDataChannel(channel) {
+            channel.binaryType = 'arraybuffer';
+            channel.bufferedAmountLowThreshold = LOW_BUFFER;
+
+            channel.onopen = () => {
+                if (pendingFile) {
+                    startHighSpeedTransfer();
+                }
+            };
+
+            // Single persistent handler (re-assigning it per wait was fragile)
+            channel.onbufferedamountlow = () => wakeSender();
+            channel.onclose = () => wakeSender();
+            channel.onerror = () => wakeSender();
+
+            // IMPORTANT: messages are processed through a promise chain so the
+            // async metadata setup (OPFS handle creation) can never be overtaken
+            // by the binary chunks that arrive right behind it.
+            channel.onmessage = (e) => {
+                rxChain = rxChain
+                    .then(() => handleIncoming(e.data))
+                    .catch((err) => {
+                        console.error('Receive error:', err);
+                        document.getElementById('status').innerText = 'Receive failed';
+                    });
+            };
+        }
+
+        function wakeSender() {
+            if (drainResolve) {
+                const r = drainResolve;
+                drainResolve = null;
+                r();
+            }
+        }
+
+        // Receiver logic
+        async function handleIncoming(data) {
+            if (typeof data === 'string') {
+                incomingFileInfo = JSON.parse(data);
+                receivedSize = 0;
+                rxBatch = [];
+                rxBatchBytes = 0;
+                incomingFileData = [];
+                fileStream = null;
+                fileHandle = null;
+
+                try {
+                    const opfsRoot = await navigator.storage.getDirectory();
+                    fileHandle = await opfsRoot.getFileHandle(incomingFileInfo.fileName, { create: true });
+                    fileStream = await fileHandle.createWritable();
+                    resetProgressUI('Streaming to Disk', incomingFileInfo.fileName);
+                } catch (err) {
+                    console.warn('OPFS not supported. RAM fallback.', err);
+                    fileStream = null;
+                    resetProgressUI('Receiving (RAM)', incomingFileInfo.fileName);
+                }
+
+                if (incomingFileInfo.fileSize === 0) {
+                    await completeReceive();
+                }
+                return;
+            }
+
+            // Binary chunk
+            receivedSize += data.byteLength;
+            updateProgressUI(receivedSize, incomingFileInfo.fileSize);
+
+            if (fileStream) {
+                // Batch many small chunks into one big disk write
+                rxBatch.push(data);
+                rxBatchBytes += data.byteLength;
+                if (rxBatchBytes >= RX_FLUSH_BYTES || receivedSize >= incomingFileInfo.fileSize) {
+                    const blob = new Blob(rxBatch);
+                    rxBatch = [];
+                    rxBatchBytes = 0;
+                    await fileStream.write(blob);
+                }
+            } else {
+                incomingFileData.push(data);
+            }
+
+            if (receivedSize >= incomingFileInfo.fileSize) {
+                await completeReceive();
+            }
+        }
+
+        async function completeReceive() {
+            if (fileStream) {
+                if (rxBatch.length) {
+                    await fileStream.write(new Blob(rxBatch));
+                    rxBatch = [];
+                    rxBatchBytes = 0;
+                }
+                await fileStream.close();
+                const completedFile = await fileHandle.getFile();
+                fileStream = null;
+                finalizeDownload(completedFile, incomingFileInfo.fileName, true);
+            } else {
+                finalizeDownload(incomingFileData, incomingFileInfo.fileName, false);
+                incomingFileData = [];
+            }
+        }
+
+        // 6. High-speed sender
+        async function startHighSpeedTransfer() {
+            const file = pendingFile;
+            pendingFile = null;
+
+            // Use the largest message size both peers support (up to 256KB)
+            let chunkSize = DEFAULT_CHUNK;
+            try {
+                const remoteMax = peerConnection.sctp && peerConnection.sctp.maxMessageSize;
+                if (remoteMax && remoteMax > 0) {
+                    chunkSize = Math.min(MAX_CHUNK, remoteMax);
+                }
+            } catch (_) { /* keep default */ }
+
+            resetProgressUI('Sending', file.name);
+            dataChannel.send(JSON.stringify({ fileName: file.name, fileSize: file.size }));
+
+            try {
+                let offset = 0;
+                // Prefetch: start reading the first block right away
+                let nextBlock = file.size > 0 ? file.slice(0, READ_BLOCK).arrayBuffer() : null;
+
+                while (offset < file.size) {
+                    const block = await nextBlock;
+                    const blockEnd = offset + block.byteLength;
+
+                    // Kick off the next disk read NOW so it overlaps with network sending
+                    nextBlock = blockEnd < file.size
+                        ? file.slice(blockEnd, blockEnd + READ_BLOCK).arrayBuffer()
+                        : null;
+
+                    for (let pos = 0; pos < block.byteLength; pos += chunkSize) {
+                        const len = Math.min(chunkSize, block.byteLength - pos);
+
+                        if (dataChannel.readyState !== 'open') {
+                            throw new Error('Data channel closed');
+                        }
+
+                        if (dataChannel.bufferedAmount > MAX_BUFFER) {
+                            await new Promise((resolve) => { drainResolve = resolve; });
+                            if (dataChannel.readyState !== 'open') {
+                                throw new Error('Data channel closed');
+                            }
+                        }
+
+                        // Zero-copy view into the block
+                        dataChannel.send(new Uint8Array(block, pos, len));
+                        updateProgressUI(offset + pos + len, file.size);
+                    }
+
+                    offset = blockEnd;
+                }
+
+                document.getElementById('status').innerText = 'Sent successfully!';
+                document.getElementById('speedMetric').innerText = '0.00 MB/s';
+                document.getElementById('etaMetric').innerText = 'Done';
+
+            } catch (error) {
+                console.error("Transfer failed:", error);
+                document.getElementById('status').innerText = 'Transfer Failed';
+            }
+        }
+
+        // UI helpers
+        function resetProgressUI(action, fileName) {
+            document.getElementById('status').innerText = `${action}: ${fileName}`;
+            document.getElementById('progressBar').value = 0;
+            document.getElementById('percentMetric').innerText = '0%';
+            document.getElementById('speedMetric').innerText = 'Calculating...';
+            document.getElementById('etaMetric').innerText = 'ETA: --';
+            windowStartTime = Date.now();
+            windowStartBytes = 0;
+            lastUiUpdate = 0;
+        }
+
+        function updateProgressUI(currentBytes, totalBytes) {
+            const now = Date.now();
+            const done = currentBytes >= totalBytes;
+
+            // Throttle DOM work (matters a lot on phones)
+            if (!done && now - lastUiUpdate < 100) return;
+            lastUiUpdate = now;
+
+            const percent = totalBytes > 0 ? Math.round((currentBytes / totalBytes) * 100) : 100;
+            document.getElementById('progressBar').value = percent;
+            document.getElementById('percentMetric').innerText = `${percent}%`;
+
+            if (now - windowStartTime >= 500 || done) {
+                const bytesInWindow = currentBytes - windowStartBytes;
+                const timeInSeconds = (now - windowStartTime) / 1000;
+                if (timeInSeconds > 0) {
+                    const speedBps = bytesInWindow / timeInSeconds;
+                    const speedMBps = (speedBps / (1024 * 1024)).toFixed(2);
+                    const remainingBytes = totalBytes - currentBytes;
+                    const etaSeconds = speedBps > 0 ? Math.round(remainingBytes / speedBps) : 0;
+
+                    document.getElementById('speedMetric').innerText = `${speedMBps} MB/s`;
+                    document.getElementById('etaMetric').innerText = `ETA: ${etaSeconds}s`;
+                }
+                windowStartTime = now;
+                windowStartBytes = currentBytes;
+            }
+        }
+
+        function finalizeDownload(dataPayload, fileName, isOpfs) {
+            document.getElementById('status').innerText = 'Transfer Complete!';
+            document.getElementById('progressBar').value = 100;
+            document.getElementById('percentMetric').innerText = '100%';
+            document.getElementById('speedMetric').innerText = '0.00 MB/s';
+            document.getElementById('etaMetric').innerText = 'Done';
+
+            const finalData = isOpfs ? dataPayload : new Blob(dataPayload);
+            const downloadUrl = URL.createObjectURL(finalData);
+
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = fileName;
+            link.click();
+        }
+    </script>
+</body>
+</html>
